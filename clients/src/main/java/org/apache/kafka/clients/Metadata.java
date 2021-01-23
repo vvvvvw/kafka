@@ -455,6 +455,8 @@ public class Metadata implements Closeable {
         return this.isClosed;
     }
 
+    //设置 更新标识，里面并没有真正发送更新元数据的请求，只是将需要更新元数据的标志位 needUpdate 设置为 true 就结束了。Kafka 必须确保在第一次拉消息之前元数据是可用的，也就是说在第一次拉消息之前必须更新一次元数据，
+    // 否则 Consumer 就不知道它应该去哪个 Broker 上去拉哪个 Partition 的消息。
     public synchronized void requestUpdateForNewTopics() {
         // Override the timestamp of last refresh to let immediate update.
         this.lastRefreshMs = 0;

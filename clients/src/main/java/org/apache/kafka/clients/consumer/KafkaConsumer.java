@@ -951,6 +951,7 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
      *                               previously (without a subsequent call to {@link #unsubscribe()}), or if not
      *                               configured at-least one partition assignment strategy
      */
+    //订阅
     @Override
     public void subscribe(Collection<String> topics, ConsumerRebalanceListener listener) {
         acquireAndEnsureOpen();
@@ -970,7 +971,9 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
                 throwIfNoAssignorsConfigured();
                 fetcher.clearBufferedDataForUnassignedTopics(topics);
                 log.info("Subscribed to topic(s): {}", Utils.join(topics, ", "));
+                // 重置订阅状态
                 if (this.subscriptions.subscribe(new HashSet<>(topics), listener))
+                    // 请求更新元数据
                     metadata.requestUpdateForNewTopics();
             }
         } finally {
@@ -1266,6 +1269,7 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
     /**
      * Visible for testing
      */
+    //真正更新元数据
     boolean updateAssignmentMetadataIfNeeded(final Timer timer) {
         if (coordinator != null && !coordinator.poll(timer)) {
             return false;
@@ -1282,12 +1286,14 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
                 Math.min(coordinator.timeToNextPoll(timer.currentTimeMs()), timer.remainingMs());
 
         // if data is available already, return it immediately
+        // 如果缓存里面有未读取的消息，直接返回这些消息
         final Map<TopicPartition, List<ConsumerRecord<K, V>>> records = fetcher.fetchedRecords();
         if (!records.isEmpty()) {
             return records;
         }
 
         // send any new fetches (won't resend pending fetches)
+        // 构造拉取消息请求，并发送
         fetcher.sendFetches();
 
         // We do not want to be stuck blocking in poll if we are missing some positions
@@ -1300,11 +1306,13 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
         }
 
         Timer pollTimer = time.timer(pollTimeout);
+        // 发送网络请求拉取消息，等待直到有消息返回或者超时
         client.poll(pollTimer, () -> {
             // since a fetch might be completed by the background thread, we need this poll condition
             // to ensure that we do not block unnecessarily in poll()
             return !fetcher.hasAvailableFetches();
         });
+        // 返回拉到的消息
         timer.update(pollTimer.currentTimeMs());
 
         // after the long poll, we should check whether the group needs to rebalance
